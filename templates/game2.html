@@ -1,0 +1,321 @@
+<html>
+
+<head>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1" />
+    <title>Redis-Python Chess Server</title>
+
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/1.4.5/socket.io.min.js"></script>
+    <script src="{{ url_for('static', filename='js/chess.js') }}"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/json3/3.3.2/json3.min.js"></script>
+    <script src="https://code.jquery.com/jquery-3.4.1.min.js"
+        integrity="sha256-CSXorXvZcTkaix6Yvo6HppcZGetbYMGWSFlBw8HfCJo=" crossorigin="anonymous"></script>
+    <script src="js/chessboard-0.3.0.min.js"></script>
+
+    <link href="http://maxcdn.bootstrapcdn.com/bootstrap/3.3.0/css/bootstrap.min.css" rel="stylesheet"
+        id="bootstrap-css">
+    <script src="http://maxcdn.bootstrapcdn.com/bootstrap/3.3.0/js/bootstrap.min.js"></script>
+
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/chessboard-0.3.0.min.css') }}" />
+
+
+    <link rel="stylesheet" href="css/chat.css" />
+    <script src="{{ url_for('static', filename='js/chat.js') }}"></script>
+
+
+    <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.8.2/css/all.css"
+        integrity="sha384-oS3vJWv+0UjzBfQzYUhtDYW+Pj2yciDJxpsK1OYPAYjqT085Qq/1cq5FLXAZQ7Ay" crossorigin="anonymous">
+
+<style>
+.game-wrapper{
+        display: none
+    }
+
+</style>
+</head>
+
+<body>
+
+    <div class="lobby">
+
+
+
+        
+
+            <div class="container" style="text-align: center; width:500px">
+                    <div class="row">
+                      <div class="span4"></div>
+                      <div class="span4">
+
+                        
+                      <div >
+                            <h2 >redis-python Chess Server v0.1</h2>
+
+                            <label for="nick">Select nickname:</label>
+                            <p>
+                                <input id="nick" class="form-control" type="text" id="nick">
+                            </p>
+                            <button id="playButton" class="btn btn-primary center-block" >Play</button>
+                        </div>
+                        </div>
+                      <div class="span4"></div>
+                    </div>
+                  </div>
+                  
+
+    </div>
+
+    <div style="text-align: center">
+
+    <div class="game-wrapper" >
+        <h3 id="roomName">Room name</h3>
+            <div>
+                <h5><span class="player1Name playerName">Player 1 </span>  <span id="playing-player1" style="display:none"><i
+                            class="glyphicon glyphicon-arrow-left"></i></span></h5>
+                <p>x</p>
+                <h5><span class="player2Name playerName">Player 2 </span>  <span id="playing-player2" style="display:none"><i
+                            class="glyphicon glyphicon-arrow-left"></i></span></h5>
+            </div>
+        
+
+            <div class="game-chat-div">
+
+                <div class="boardDiv" style="width: 500px">
+                    <div id="board" style="width: 500px"></div>
+                </div>
+
+
+                <div class="chat-body">
+                    <div class="chat_window">
+                        <div class="top_menu">
+                            <div class="title">Chat</div>
+                        </div>
+                        <ul class="messages"></ul>
+                        <div class="bottom_wrapper clearfix">
+                            <div class="message_input_wrapper"><input class="message_input" /></div>
+                            <div class="send_message">
+                                <div class="icon"></div>
+                                <div class="text">Send</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="message_template">
+                        <li class="message">
+                            <div class="avatar">
+                                <p class="avatarP"></p>
+                            </div>
+                            <div class="text_wrapper">
+                                <div class="text"></div>
+                            </div>
+                        </li>
+                    </div>
+                </div>
+
+                
+            </div>
+    </div>
+
+    </div>
+
+
+
+
+
+    <script>
+
+        $(document).ready(function () {
+
+            $("#playButton").click(function(){
+
+                if($("#nick").val() == "")
+                    alert("Invalid nickname")
+                else{ 
+                    $(".lobby").hide() 
+                    nick = $("#nick").val();
+                    $.get("http://localhost:5000/joinRoom?nick="+nick, function(data, status){
+                        data = JSON.parse(data);
+                        roomName = data.roomName
+                        player = data.playerNmbr
+
+                            
+                            // schedule first updateTimer() call
+                            setTimeout(checkEnemy(roomName, player, nick), 2000);
+
+
+                        
+
+                    })
+                    
+                }
+
+
+            });
+
+
+            function checkEnemy(roomName, player, nick){
+
+                $.get("http://localhost:5000/getPlayers?roomName="+roomName, function(data, status){
+                          data = JSON.parse(data)
+                          if(data.length>1){
+                              $(".player2Name").html(data[0])
+                              $(".player1Name").html(data[1])
+
+                            $(".game-wrapper").css("display", "block")
+                            play(roomName, player, nick)
+                          }else{
+
+                            setTimeout(checkEnemy(roomName, player, nick), 2000);
+                          }
+
+                });
+
+
+            }
+        
+
+
+        var play = function(roomName, player, nick){
+            //var socket = io('http://localhost:5000');
+            var messages = [];
+            var boardFen = [];
+            var board,
+                game = new Chess("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"),
+                statusEl = $('#status'),
+                fenEl = $('#fen'),
+                pgnEl = $('#pgn');
+
+            $("#playing-player1").css("display","inline")
+
+            $("#roomName").html("Room "+roomName.split(":")[1])
+
+            
+
+            $('.send_message').click(function (e) {
+
+                return sendMessage($('.message_input').val(), nick, roomName);
+            });
+            $('.message_input').keyup(function (e) {
+                if (e.which === 13) {
+                    return sendMessage($('.message_input').val(), nick, roomName);
+                }
+            });
+
+            var onDragStart = function (source, piece, position, orientation) {
+                console.log(game.turn() + " - " + player)
+                if ((orientation === 'white' && piece.search(/^w/) === -1) ||
+                    (orientation === 'black' && piece.search(/^b/) === -1) ||
+                    (game.turn() === 'w' && player == 2) ||
+                    (game.turn() === 'b' && player == 1)) {
+                    return false;
+                }
+            };
+
+            var onDrop = function (source, target) {
+                var move = game.move({
+                    from: source,
+                    to: target,
+                    promotion: 'q' // NOTE: always promote to a queen for example simplicity
+                });
+
+                // illegal move
+                if (move === null) return 'snapback';
+            };
+       
+            var onSnapEnd = function () {
+                data = {
+                    //the actual FEN position played
+                    fen: game.fen(),
+                    time: Date.now()
+                }
+                $.ajax({
+                    type: "POST",
+                    url: "http://localhost:5000/play",
+                    data: {
+                        data: JSON.stringify(data),
+                        roomName: roomName
+
+                    },
+                    error: function (request, status, error) {
+                        alert(request.responseText);
+                    }
+                });
+                board.position(game.fen());
+            };
+
+            //chessboard configurations. Board is set with pieces in start position and black is to play.
+            var cfg = {
+                draggable: true,
+                position: "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+                onDragStart: onDragStart,
+                onDrop: onDrop,
+                onSnapEnd: onSnapEnd,
+            };
+            board = ChessBoard('board', cfg);
+            // if the player is playing with black pieces, the board is flipped
+            if (player == 2)
+                board.flip();
+
+
+            //})
+
+
+            function updateRoom(){
+
+            $.get("http://localhost:5000/getRoomData?roomName="+roomName, function(data, status){
+                        data = JSON.parse(data);
+                        if(data.game.length != 0){
+                            gameArray = JSON.parse(data.game[0]);
+                            gameArray = JSON.parse(gameArray)
+                            fen = gameArray.fen
+                            if(boardFen.length == 0){
+                            boardFen.push(gameArray)
+                            board.position(fen)
+                            game.load(fen)
+                            }else if(gameArray.time> boardFen[boardFen.length-1].time){
+                                boardFen.push(gameArray)
+                                board.position(fen)
+                                game.load(fen)
+                            }
+                        }
+
+                        
+                        messagesServer = [];
+                        data.chat.forEach(element => {
+                            messagesServer.push(JSON.parse(JSON.parse(element)))
+                        });
+                        messagesServer.reverse()
+                        diff = messagesServer.length - messages.length
+                        newMessages = [];
+                        for (index = messagesServer.length-diff; index < messagesServer.length; index++) {
+                            newMessages.push(messagesServer[index]);
+                        }
+                        
+                        newMessages.forEach(element => {
+                            messages.push(element)
+                            writeMessage(element, nick);
+                        });
+
+                        if(game.turn() == 'w'){
+                            $("#playing-player1").css("display","inline")                            
+                            $("#playing-player2").css("display","none")
+                        }else{
+                            $("#playing-player1").css("display","none")                            
+                            $("#playing-player2").css("display","inline")
+
+                        }
+            });
+            setTimeout(updateRoom, 2000);
+
+            }
+            // schedule first updateTimer() call
+            setTimeout(updateRoom, 2000);
+
+        }
+
+        });
+    </script>
+
+</body>
+
+</html>
