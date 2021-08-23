@@ -11,7 +11,7 @@ This chess server was made to practice the usage of redis in a use case applicat
 To download and setup the server, just follow these easy steps
 
 ```sh
-https://github.com/cesarpurper/redis-chess-server.git
+git clone https://github.com/cesarpurper/redis-chess-server.git
 cd redis-chess-server
 docker-compose up
 ```
